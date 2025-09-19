@@ -204,6 +204,27 @@ class InvoiceTemplate(OrderedDictType[str, Any]):
         logger.debug("result of date parsing=%s", res)
         return res
 
+    def extract_number_from_text(self, value: str) -> str:
+        """Extracts the first numeric value from a string containing text.
+
+        This function finds and extracts numeric values from strings that may
+        contain text like "4 Stück", "12123 Stk.", "€25.50", etc.
+
+        Args:
+            value (str): The string containing numbers and possibly text.
+
+        Returns:
+            str: The extracted numeric value as a string, or empty string if no number found.
+        """
+        # Pattern to match numbers with optional decimal separators
+        # This matches: 123, 123.45, 123,45, 1.234,56, 1,234.56, etc.
+        pattern = r'[-+]?\d{1,3}(?:[.,\s\']\d{3})*(?:[.,]\d+)?'
+        
+        match = re.search(pattern, value)
+        if match:
+            return match.group().strip()
+        return ""
+
     def coerce_type(self, value: str, target_type: str) -> Any:
         """Coerces a value to the specified target type.
 
@@ -221,11 +242,19 @@ class InvoiceTemplate(OrderedDictType[str, Any]):
         if target_type == "int":
             if not value:
                 return 0
-            return int(self.parse_number(value))
+            # Extract numeric value from text that might contain units like "4 Stück"
+            numeric_value = self.extract_number_from_text(value)
+            if not numeric_value:
+                return 0
+            return int(self.parse_number(numeric_value))
         elif target_type == "float":
             if not value:
                 return 0.0
-            return float(self.parse_number(value))
+            # Extract numeric value from text that might contain units like "12123 Stk."
+            numeric_value = self.extract_number_from_text(value)
+            if not numeric_value:
+                return 0.0
+            return float(self.parse_number(numeric_value))
         elif target_type == "date":
             return self.parse_date(value)
         elif target_type == "datetime":
